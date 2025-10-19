@@ -294,3 +294,6 @@ try:
             el.href = url
             el.download = "prepared_cars.csv"
             el.style.display = "inline-block"
+except Exception as e:
+    # необязательная диагностика в консоль
+    print("CSV export error:", e)
