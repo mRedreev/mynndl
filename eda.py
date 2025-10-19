@@ -7,7 +7,7 @@ from js import document, console
 from pyodide.ffi import create_proxy
 
 DATA_URL_DEFAULT = "https://raw.githubusercontent.com/evgpat/edu_stepik_practical_ml/main/datasets/cars_prices.csv"
-AUTORUN = False  # set True to auto-run on page load
+AUTORUN = True  # run automatically once PyScript is ready
 
 def coerce_numeric(df, cols):
     for c in cols:
@@ -181,10 +181,14 @@ def _on_click_run(evt=None):
     url = url_input.value.strip() if url_input and url_input.value and url_input.value.strip() else DATA_URL_DEFAULT
     run_eda(url)
 
+_event_proxies = {}
+
 def attach_handlers():
     btn = document.getElementById("run-eda-btn")
     if btn:
         cb = create_proxy(_on_click_run)
+        # store proxy globally so it isn't garbage-collected by Pyodide
+        _event_proxies["run_eda_btn"] = cb
         btn.addEventListener("click", cb, False)
 
 attach_handlers()
