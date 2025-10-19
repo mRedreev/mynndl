@@ -24,7 +24,7 @@ except Exception:
     def create_proxy(fn): return fn
 
 # ---- Constants
-DATA_URL_DEFAULT = "https://raw.githubusercontent.com/evgpat/edu_stepik_practical_ml/main/datasets/cars_prices.csv"
+DATA_URL_DEFAULT = "https://github.com/mRedreev/mynndl/blob/codex/-eda-hjfild/data.csv"
 AUTORUN = True  # auto-run in browser when PyScript is ready
 
 # ---- Helpers
