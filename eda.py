@@ -4,28 +4,39 @@ import numpy as np
 
 # ---- Detect environment: PyScript/Pyodide (browser) vs regular Python
 IS_PYODIDE = False
+open_url = None
 try:
-    from js import document, console  # available only in PyScript/Pyodide
+    import js  # ВАЖНО: только 'import js', без micropip/пакетов
     from pyodide.ffi import create_proxy
-    import pyodide_http  # enables network access for pandas/urllib under Pyodide
-    pyodide_http.patch_all()
+    try:
+        # опционально: если установлен, пропатчит urllib для pandas
+        import pyodide_http
+        pyodide_http.patch_all()
+    except Exception:
+        pass
+    try:
+        from pyodide.http import open_url  # надёжный загрузчик CSV в браузере
+    except Exception:
+        open_url = None
     IS_PYODIDE = True
+    document = js.document
+    console = js.console
 except Exception:
-    # Fallback shims for local/regular Python so the same file runs in notebooks/CLI
+    # Локальная среда (не браузер)
     class _DummyConsole:
         def log(self, *a, **k): print(*a)
         def error(self, *a, **k): print(*a)
     class _DummyDocument:
         def getElementById(self, *a, **k): return None
         def createElement(self, *a, **k): return None
-        def body(self): return None
     console = _DummyConsole()
     document = _DummyDocument()
     def create_proxy(fn): return fn
 
 # ---- Constants
-DATA_URL_DEFAULT = "https://github.com/mRedreev/mynndl/blob/codex/-eda-hjfild/data.csv"
-AUTORUN = True  # auto-run in browser when PyScript is ready
+# Самый беспроблемный путь на GitHub Pages — локальный CSV в корне репо:
+DATA_URL_DEFAULT = "./data.csv"
+AUTORUN = True  # автостарт в браузере
 
 # ---- Helpers
 def coerce_numeric(df, cols):
@@ -34,8 +45,24 @@ def coerce_numeric(df, cols):
             df[c] = pd.to_numeric(df[c], errors="coerce")
     return df
 
+def _read_csv_robust(url: str, **kwargs):
+    """
+    Универсальная загрузка CSV:
+    - В PyScript: сперва пробуем open_url (если доступен), иначе обычный read_csv (вдруг pyodide_http пропатчил).
+    - Локально: обычный read_csv.
+    """
+    if IS_PYODIDE:
+        if open_url is not None:
+            try:
+                return pd.read_csv(open_url(url), **kwargs)
+            except Exception as e:
+                console.error("open_url failed; fallback to plain read_csv:", str(e))
+        return pd.read_csv(url, **kwargs)
+    else:
+        return pd.read_csv(url, **kwargs)
+
 def load_and_clean(url: str = DATA_URL_DEFAULT) -> pd.DataFrame:
-    df = pd.read_csv(url, decimal='.')
+    df = _read_csv_robust(url, decimal='.')
     df = df.replace('?', np.nan)
     if 'price' in df.columns:
         df = df[~df['price'].isna()].copy()
@@ -121,9 +148,10 @@ def make_conclusions(corr_items):
         direction = "выше" if val > 0 else "ниже"
         strength = 'высокую' if abs(val) >= 0.5 else ('умеренную' if abs(val) >= 0.3 else 'слабую')
         bullets.append(f"Признак '{feat}' имеет {strength} корреляцию с ценой ({val:.2f}): чем {feat} больше, тем {direction} цена (в среднем).")
+        # при желании сюда можно добавить интерпретации для бинарных/лог. переменных
     return bullets
 
-# ---- Output helpers (DOM in browser, memory/local files in Python)
+# ---- Output helpers
 _JSON_CACHE = {}
 
 def to_json_script(id_: str, payload: dict):
@@ -197,11 +225,7 @@ def run_eda(url: str = None):
             if ready_flag:
                 ready_flag.textContent = "ready"
         console.log("EDA finished successfully")
-        return {
-            "overview": overview,
-            "top_corr": top_corr,
-            "engineered": eng_list
-        }
+        return {"overview": overview, "top_corr": top_corr, "engineered": eng_list}
     except Exception as e:
         console.error("EDA error:", str(e))
         import traceback as _tb
