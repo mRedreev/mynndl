@@ -1,23 +1,31 @@
 import json
+import importlib
 import pandas as pd
 import numpy as np
 
 # ---- Detect environment: PyScript/Pyodide (browser) vs regular Python
 IS_PYODIDE = False
 open_url = None
+create_proxy = None
 try:
-    import js  # ВАЖНО: только 'import js', без micropip/пакетов
-    from pyodide.ffi import create_proxy
+    js = importlib.import_module("js")  # динамический импорт, чтобы PyScript не искал пакет "js"
+    pyodide_ffi = importlib.import_module("pyodide.ffi")
+    create_proxy = pyodide_ffi.create_proxy
+
     try:
         # опционально: если установлен, пропатчит urllib для pandas
-        import pyodide_http
-        pyodide_http.patch_all()
+        pyodide_http = importlib.import_module("pyodide_http")
+        if hasattr(pyodide_http, "patch_all"):
+            pyodide_http.patch_all()
     except Exception:
         pass
+
     try:
-        from pyodide.http import open_url  # надёжный загрузчик CSV в браузере
+        pyodide_http_mod = importlib.import_module("pyodide.http")
+        open_url = getattr(pyodide_http_mod, "open_url", None)
     except Exception:
         open_url = None
+
     IS_PYODIDE = True
     document = js.document
     console = js.console
