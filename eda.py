@@ -1,22 +1,76 @@
-
 import json
-import math
+import importlib
 import pandas as pd
 import numpy as np
-from js import document, console
-from pyodide.ffi import create_proxy
 
-DATA_URL_DEFAULT = "https://raw.githubusercontent.com/evgpat/edu_stepik_practical_ml/main/datasets/cars_prices.csv"
-AUTORUN = False  # set True to auto-run on page load
+# ---- Detect environment: PyScript/Pyodide (browser) vs regular Python
+IS_PYODIDE = False
+open_url = None
+create_proxy = None
+try:
+    js = importlib.import_module("js")  # динамический импорт, чтобы PyScript не искал пакет "js"
+    pyodide_ffi = importlib.import_module("pyodide.ffi")
+    create_proxy = pyodide_ffi.create_proxy
 
+    try:
+        # опционально: если установлен, пропатчит urllib для pandas
+        pyodide_http = importlib.import_module("pyodide_http")
+        if hasattr(pyodide_http, "patch_all"):
+            pyodide_http.patch_all()
+    except Exception:
+        pass
+
+    try:
+        pyodide_http_mod = importlib.import_module("pyodide.http")
+        open_url = getattr(pyodide_http_mod, "open_url", None)
+    except Exception:
+        open_url = None
+
+    IS_PYODIDE = True
+    document = js.document
+    console = js.console
+except Exception:
+    # Локальная среда (не браузер)
+    class _DummyConsole:
+        def log(self, *a, **k): print(*a)
+        def error(self, *a, **k): print(*a)
+    class _DummyDocument:
+        def getElementById(self, *a, **k): return None
+        def createElement(self, *a, **k): return None
+    console = _DummyConsole()
+    document = _DummyDocument()
+    def create_proxy(fn): return fn
+
+# ---- Constants
+# Самый беспроблемный путь на GitHub Pages — локальный CSV в корне репо:
+DATA_URL_DEFAULT = "./data.csv"
+AUTORUN = True  # автостарт в браузере
+
+# ---- Helpers
 def coerce_numeric(df, cols):
     for c in cols:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
     return df
 
+def _read_csv_robust(url: str, **kwargs):
+    """
+    Универсальная загрузка CSV:
+    - В PyScript: сперва пробуем open_url (если доступен), иначе обычный read_csv (вдруг pyodide_http пропатчил).
+    - Локально: обычный read_csv.
+    """
+    if IS_PYODIDE:
+        if open_url is not None:
+            try:
+                return pd.read_csv(open_url(url), **kwargs)
+            except Exception as e:
+                console.error("open_url failed; fallback to plain read_csv:", str(e))
+        return pd.read_csv(url, **kwargs)
+    else:
+        return pd.read_csv(url, **kwargs)
+
 def load_and_clean(url: str = DATA_URL_DEFAULT) -> pd.DataFrame:
-    df = pd.read_csv(url, decimal='.')
+    df = _read_csv_robust(url, decimal='.')
     df = df.replace('?', np.nan)
     if 'price' in df.columns:
         df = df[~df['price'].isna()].copy()
@@ -72,7 +126,7 @@ def cat_frequencies(df: pd.DataFrame, col, top=15):
     data = []
     if col in df.columns:
         vc = df[col].astype(str).value_counts().head(top)
-        data = [{'category': k, 'count': int(v)} for k,v in vc.items()]
+        data = [{'category': k, 'count': int(v)} for k, v in vc.items()]
     return data
 
 def corr_matrix(df: pd.DataFrame, target_first=True):
@@ -88,13 +142,10 @@ def top_price_correlations(df: pd.DataFrame, k=8):
         return []
     corr = df.select_dtypes(include=[np.number]).corr()['price'].drop('price', errors='ignore').dropna()
     corr_sorted = corr.reindex(corr.abs().sort_values(ascending=False).index)
-    items = []
-    for feat, val in corr_sorted.head(k).items():
-        items.append({'feature': feat, 'corr_with_price': float(val)})
-    return items
+    return [{'feature': feat, 'corr_with_price': float(val)} for feat, val in corr_sorted.head(k).items()]
 
 def dataset_overview(df: pd.DataFrame):
-    dtypes = {c: str(t) for c,t in df.dtypes.items()}
+    dtypes = {c: str(t) for c, t in df.dtypes.items()}
     return {'n_rows': int(df.shape[0]), 'n_cols': int(df.shape[1]), 'columns': list(df.columns), 'dtypes': dtypes}
 
 def make_conclusions(corr_items):
@@ -102,32 +153,43 @@ def make_conclusions(corr_items):
     for item in corr_items:
         feat = item['feature']
         val = item['corr_with_price']
-        direction = "выше" if val>0 else "ниже"
-        strength = 'высокую' if abs(val)>=0.5 else ('умеренную' if abs(val)>=0.3 else 'слабую')
+        direction = "выше" if val > 0 else "ниже"
+        strength = 'высокую' if abs(val) >= 0.5 else ('умеренную' if abs(val) >= 0.3 else 'слабую')
         bullets.append(f"Признак '{feat}' имеет {strength} корреляцию с ценой ({val:.2f}): чем {feat} больше, тем {direction} цена (в среднем).")
+        # при желании сюда можно добавить интерпретации для бинарных/лог. переменных
     return bullets
 
+# ---- Output helpers
+_JSON_CACHE = {}
+
 def to_json_script(id_: str, payload: dict):
-    el = document.getElementById(id_)
-    if el is None:
-        el = document.createElement("script")
-        el.setAttribute("type", "application/json")
-        el.setAttribute("id", id_)
-        document.body.appendChild(el)
-    # stringify with ensure_ascii=False to keep Cyrillic readable
-    import json as _json
-    el.textContent = _json.dumps(payload, ensure_ascii=False)
+    if IS_PYODIDE:
+        el = document.getElementById(id_)
+        if el is None:
+            el = document.createElement("script")
+            el.setAttribute("type", "application/json")
+            el.setAttribute("id", id_)
+            document.body.appendChild(el)
+        el.textContent = json.dumps(payload, ensure_ascii=False)
+    else:
+        _JSON_CACHE[id_] = payload
 
 def generate_prepared_csv(df: pd.DataFrame):
-    import base64
-    csv_bytes = df.to_csv(index=False).encode("utf-8")
-    b64 = base64.b64encode(csv_bytes).decode("utf-8")
-    href = f"data:text/csv;base64,{b64}"
-    a = document.getElementById("download-prepared-link")
-    a.setAttribute("href", href)
-    a.setAttribute("download", "cars_prepared.csv")
-    a.style.display = "inline-block"
+    if IS_PYODIDE:
+        import base64
+        csv_bytes = df.to_csv(index=False).encode("utf-8")
+        b64 = base64.b64encode(csv_bytes).decode("utf-8")
+        href = f"data:text/csv;base64,{b64}"
+        a = document.getElementById("download-prepared-link")
+        if a:
+            a.setAttribute("href", href)
+            a.setAttribute("download", "cars_prepared.csv")
+            a.style.display = "inline-block"
+    else:
+        df.to_csv("cars_prepared.csv", index=False)
+        console.log("Saved cars_prepared.csv in current directory")
 
+# ---- Main EDA pipeline
 def run_eda(url: str = None):
     try:
         url = url or DATA_URL_DEFAULT
@@ -163,32 +225,55 @@ def run_eda(url: str = None):
 
         generate_prepared_csv(df_enriched)
 
-        import json as _json
-        head_json = _json.loads(df_enriched.head(10).to_json(orient="records"))
+        head_json = json.loads(df_enriched.head(10).to_json(orient="records"))
         to_json_script("data-head", {'rows': head_json})
 
-        ready_flag = document.getElementById("eda-ready-flag")
-        if ready_flag:
-            ready_flag.textContent = "ready"
+        if IS_PYODIDE:
+            ready_flag = document.getElementById("eda-ready-flag")
+            if ready_flag:
+                ready_flag.textContent = "ready"
         console.log("EDA finished successfully")
+        return {"overview": overview, "top_corr": top_corr, "engineered": eng_list}
     except Exception as e:
         console.error("EDA error:", str(e))
         import traceback as _tb
         console.error(_tb.format_exc())
+        raise
 
+# ---- Button (only in browser)
+_event_proxies = {}
 def _on_click_run(evt=None):
-    url_input = document.getElementById("data-url-input")
-    url = url_input.value.strip() if url_input and url_input.value and url_input.value.strip() else DATA_URL_DEFAULT
+    url = None
+    if IS_PYODIDE:
+        url_input = document.getElementById("data-url-input")
+        url = url_input.value.strip() if url_input and url_input.value and url_input.value.strip() else DATA_URL_DEFAULT
     run_eda(url)
 
 def attach_handlers():
+    if not IS_PYODIDE:
+        return
     btn = document.getElementById("run-eda-btn")
     if btn:
         cb = create_proxy(_on_click_run)
+        _event_proxies["run_eda_btn"] = cb  # prevent GC of proxy
         btn.addEventListener("click", cb, False)
 
 attach_handlers()
 
-# Optional autorun once PyScript is ready
+# ---- Autorun
 if AUTORUN:
-    run_eda(DATA_URL_DEFAULT)
+    try:
+        run_eda(DATA_URL_DEFAULT)
+    except Exception:
+        pass
+
+# ---- Local run (python eda.py)
+if __name__ == "__main__":
+    out = run_eda()
+    print("\n== Overview ==")
+    print(out["overview"])
+    print("\n== Top correlations with price ==")
+    for item in out["top_corr"]:
+        print(item)
+    print("\n== Engineered features ==")
+    print(out["engineered"])
