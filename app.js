@@ -1,11 +1,12 @@
-// ===== helpers =====
+// ============ helpers ============
 function getPayload(id) {
   const el = document.getElementById(id);
   if (!el) return null;
   try { return JSON.parse(el.textContent || "{}"); } catch { return null; }
 }
 
-// универсальный авто-ресайз для любого plotly-графика
+const PLOTLY_CONFIG = { responsive: true, displayModeBar: false };
+
 function attachAutoResize(el) {
   const ro = new ResizeObserver(() => {
     try { Plotly.Plots.resize(el); } catch {}
@@ -13,32 +14,7 @@ function attachAutoResize(el) {
   ro.observe(el);
 }
 
-// Быстрое правило: на узких экранах — 1 график в ряд (span 12),
-// на широких — 2 графика в ряд (span 6)
-function computeSpan() {
-  return window.matchMedia('(max-width: 900px)').matches ? 12 : 6;
-}
-
-// переназначить span всем дочерним .chart внутри контейнера-сетки
-function applySpans(container) {
-  const span = computeSpan();
-  Array.from(container.querySelectorAll('.chart')).forEach(div => {
-    div.style.gridColumn = `span ${span}`;
-  });
-}
-
-// следим за изменением ширины контейнера — обновляем span
-function watchGrid(container) {
-  const ro = new ResizeObserver(() => applySpans(container));
-  ro.observe(container);
-  // первичная расстановка
-  applySpans(container);
-}
-
-// общий конфиг для plotly
-const PLOTLY_CONFIG = { responsive: true, displayModeBar: false };
-
-// ===== renderers =====
+// ============ renderers ============
 function renderOverview() {
   const data = getPayload("data-overview");
   if (!data) return;
@@ -78,24 +54,88 @@ function renderMissing() {
   attachAutoResize(div);
 }
 
+/**
+ * Новый вариант: в карточке "Распределения (числовые)"
+ * создаём выпадающий список колонок и ОДИН график гистограммы.
+ */
 function renderDists() {
   const d = getPayload("data-dists") || {};
   const container = document.getElementById("dist-charts");
   container.innerHTML = "";
 
-  // следим за контейнером и расставляем span детям
-  watchGrid(container);
+  const cols = Object.keys(d);
+  if (!cols.length) {
+    container.innerHTML = "<em>Числовых колонок не найдено.</em>";
+    return;
+  }
 
-  Object.entries(d).forEach(([col, arr]) => {
-    const div = document.createElement("div");
-    div.className = "chart";
-    // span выставится через applySpans/watchGrid
-    container.appendChild(div);
+  // UI: селект + (опционально) количество корзин
+  const ui = document.createElement("div");
+  ui.className = "controls";
+  ui.style.marginBottom = "8px";
+
+  const labelSel = document.createElement("label");
+  labelSel.textContent = "Колонка:";
+  labelSel.style.opacity = 0.8;
+
+  const select = document.createElement("select");
+  select.id = "dist-select";
+  select.style.background = "#0c1430";
+  select.style.color = "var(--text)";
+  select.style.border = "1px solid var(--border)";
+  select.style.borderRadius = "12px";
+  select.style.padding = "8px 10px";
+  select.style.minWidth = "220px";
+
+  cols.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    select.appendChild(opt);
+  });
+
+  const labelBins = document.createElement("label");
+  labelBins.textContent = "Корзин:";
+  labelBins.style.opacity = 0.8;
+
+  const bins = document.createElement("input");
+  bins.type = "number";
+  bins.min = "5";
+  bins.max = "200";
+  bins.value = "40";
+  bins.step = "5";
+  bins.id = "dist-bins";
+  bins.style.width = "90px";
+  bins.style.background = "#0c1430";
+  bins.style.color = "var(--text)";
+  bins.style.border = "1px solid var(--border)";
+  bins.style.borderRadius = "12px";
+  bins.style.padding = "8px 10px";
+
+  ui.appendChild(labelSel);
+  ui.appendChild(select);
+  ui.appendChild(labelBins);
+  ui.appendChild(bins);
+
+  // контейнер графика
+  const plot = document.createElement("div");
+  plot.id = "dist-chart";
+  plot.className = "chart";
+
+  container.appendChild(ui);
+  container.appendChild(plot);
+
+  // функция отрисовки выбранной колонки
+  const draw = () => {
+    const col = select.value;
+    const nb = Math.max(5, Math.min(200, parseInt(bins.value || "40", 10)));
+    const arr = d[col] || [];
 
     const trace = {
       x: arr,
       type: "histogram",
-      nbinsx: 40,
+      nbinsx: nb,
+      marker: { line: { width: 0 } },
       hovertemplate: "%{x}<extra></extra>"
     };
 
@@ -104,15 +144,20 @@ function renderDists() {
       margin: { t: 36, r: 10, b: 40, l: 50 },
       autosize: true,
       xaxis: { automargin: true, tickfont: { size: 11 } },
-      yaxis: { automargin: true, tickfont: { size: 11 } }
+      yaxis: { automargin: true, tickfont: { size: 11 }, title: "Частота" }
     };
 
-    Plotly.newPlot(div, [trace], layout, PLOTLY_CONFIG);
-    attachAutoResize(div);
-  });
+    Plotly.newPlot(plot, [trace], layout, PLOTLY_CONFIG);
+    attachAutoResize(plot);
+  };
 
-  // первичное выставление span (на случай, если графики уже добавлены)
-  applySpans(container);
+  // события
+  select.addEventListener("change", draw);
+  bins.addEventListener("change", draw);
+  bins.addEventListener("input", () => { /* мгновенная реакция */ draw(); });
+
+  // первичный рендер
+  draw();
 }
 
 function renderCats() {
@@ -199,11 +244,11 @@ function renderHeadTable() {
   tbody.innerHTML = rows.map(r=>"<tr>"+cols.map(c=>`<td>${r[c]}</td>`).join("")+"</tr>").join("");
 }
 
-// ===== bootstrap =====
+// ============ bootstrap ============
 function hydrateAll() {
   renderOverview();
   renderMissing();
-  renderDists();        // теперь нормальная сетка и ресайз
+  renderDists();        // <- теперь селект + одиночная гистограмма
   renderCats();
   renderCorr();
   renderConclusions();
