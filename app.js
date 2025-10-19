@@ -36,7 +36,7 @@ function renderMissing() {
   const div = document.getElementById("missing-chart");
 
   if (!categories.length) {
-    div.innerHTML = "<em>Пропусков нет.</em>";
+    div.innerHTML = "<em>No missing values.</em>";
     return;
   }
 
@@ -45,10 +45,10 @@ function renderMissing() {
     x: categories,
     y: values
   }], {
-    title: "Пропуски по столбцам",
+    title: "Missing values in columns",
     margin: { t: 36, r: 10, b: 40, l: 50 },
     xaxis: { automargin: true, tickfont: { size: 11 } },
-    yaxis: { title: "Количество", automargin: true, tickfont: { size: 11 } }
+    yaxis: { title: "Quantity", automargin: true, tickfont: { size: 11 } }
   }, PLOTLY_CONFIG);
 
   attachAutoResize(div);
@@ -66,7 +66,7 @@ function renderDists() {
 
   const cols = Object.keys(d);
   if (!cols.length) {
-    container.innerHTML = "<em>Числовых колонок не найдено.</em>";
+    container.innerHTML = "<em>No numeric columns.</em>";
     return;
   }
 
@@ -112,7 +112,7 @@ function renderDists() {
   ["hist","box","violin"].forEach(m => {
     const o = document.createElement("option");
     o.value = m;
-    o.textContent = ({hist:"Гистограмма", box:"Box plot", violin:"Violin"})[m];
+    o.textContent = ({hist:"Histogram", box:"Box plot", violin:"Violin"})[m];
     mode.appendChild(o);
   });
   Object.assign(mode.style, {
@@ -124,11 +124,11 @@ function renderDists() {
     minWidth: "160px"
   });
 
-  ui.appendChild(mkLabel("Колонка:"));
+  ui.appendChild(mkLabel("Column:"));
   ui.appendChild(select);
-  ui.appendChild(mkLabel("Режим:"));
+  ui.appendChild(mkLabel("Plot type:"));
   ui.appendChild(mode);
-  ui.appendChild(mkLabel("Корзин:"));
+  ui.appendChild(mkLabel("Buckets:"));
   ui.appendChild(bins);
 
   // контейнер для одного графика
@@ -145,7 +145,7 @@ function renderDists() {
     const nb = Math.max(5, Math.min(200, parseInt(bins.value || "40", 10)));
     const m = mode.value;
 
-    let trace, layoutTitle = `Распределение: ${col}`;
+    let trace, layoutTitle = `Distribution: ${col}`;
 
     if (m === "hist") {
       trace = {
@@ -171,7 +171,7 @@ function renderDists() {
       margin: { t: 36, r: 10, b: 40, l: 50 },
       autosize: true,
       xaxis: { automargin: true, tickfont: { size: 11 } },
-      yaxis: { automargin: true, tickfont: { size: 11 }, title: m==="hist" ? "Частота" : "" }
+      yaxis: { automargin: true, tickfont: { size: 11 }, title: m==="hist" ? "Frequency" : "" }
     };
 
     Plotly.newPlot(plot, [trace], layout, PLOTLY_CONFIG);
@@ -207,9 +207,9 @@ function renderCats() {
     yaxis: { automargin: true, tickfont: { size: 11 } }
   };
 
-  Plotly.newPlot(makeDiv, [mk], { ...layoutCommon, title: "TOP-15 брендов (частоты)" }, PLOTLY_CONFIG);
-  Plotly.newPlot(bodyDiv, [bd], { ...layoutCommon, title: "Body style (частоты)" }, PLOTLY_CONFIG);
-  Plotly.newPlot(driveDiv, [dw], { ...layoutCommon, title: "Drive wheels (частоты)" }, PLOTLY_CONFIG);
+  Plotly.newPlot(makeDiv, [mk], { ...layoutCommon, title: "TOP-15 brands (frequences)" }, PLOTLY_CONFIG);
+  Plotly.newPlot(bodyDiv, [bd], { ...layoutCommon, title: "Body style (frequences)" }, PLOTLY_CONFIG);
+  Plotly.newPlot(driveDiv, [dw], { ...layoutCommon, title: "Drive wheels (frequences)" }, PLOTLY_CONFIG);
 
   attachAutoResize(makeDiv);
   attachAutoResize(bodyDiv);
@@ -227,7 +227,7 @@ function renderCorr() {
     z: z, x: cols, y: cols, type: "heatmap", zmin: -1, zmax: 1,
     colorbar: { thickness: 12 }
   }], {
-    title: "Матрица корреляций",
+    title: "Correlation matrix",
     margin: { t: 36, r: 30, b: 40, l: 60 },
     xaxis: { automargin: true, tickfont: { size: 10 } },
     yaxis: { automargin: true, tickfont: { size: 10 } }
