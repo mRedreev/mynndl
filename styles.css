@@ -97,3 +97,22 @@ footer {
   font-size: 13px;
 }
 .hidden { display: none; }
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;         
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; 
+}
+
+.table-scroll table {
+  width: max-content;  
+  min-width: 100%;     
+}
+
+.table-scroll::-webkit-scrollbar { height: 10px; }
+.table-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+.table-scroll::-webkit-scrollbar-track { background: transparent; }
