@@ -277,3 +277,20 @@ if __name__ == "__main__":
         print(item)
     print("\n== Engineered features ==")
     print(out["engineered"])
+
+try:
+    from js import document, Blob, URL
+    
+    csv_text = df_prepared.to_csv(index=False)
+    with open("prepared_cars.csv", "w", encoding="utf-8") as f:
+        f.write(csv_text)
+
+    blob = Blob.new([csv_text], { "type": "text/csv;charset=utf-8" })
+    url = URL.createObjectURL(blob)
+
+    for link_id in ["download-prepared-link", "download-prepared-link-bottom"]:
+        el = document.getElementById(link_id)
+        if el:
+            el.href = url
+            el.download = "prepared_cars.csv"
+            el.style.display = "inline-block"
