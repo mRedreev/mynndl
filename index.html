@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EDA — Цены на авто</title>
+  <title>EDA Car prices</title>
   <link rel="stylesheet" href="styles.css">
 
   <!-- Plotly.js -->
@@ -19,7 +19,7 @@
 <body>
   <div class="container">
     <header>
-      <h1>EDA — Предсказание стоимости автомобилей</h1>
+      <h1>EDA — Car prices prediction</h1>
       <span class="badge">GitHub Pages • PyScript + Plotly</span>
     </header>
 
@@ -28,59 +28,58 @@
         <input id="data-url-input" type="text"
                placeholder="URL CSV"
                value="" />
-        <button id="run-eda-btn">Запустить EDA</button>
+        <button id="run-eda-btn">Run EDA</button>
 
         <a id="download-prepared-link" class="badge" href="#" style="display:none;">Скачать подготовленный датасет (CSV)</a>
       </div>
-      <p class="muted">Скрипт на Python считывает данные, обрабатывает пропуски, создаёт новые признаки, формирует сводную информацию и передаёт JSON в JavaScript для визуализаций.</p>
     </div>
 
     <div class="grid">
       <div class="card col-6">
-        <h3>Общая информация</h3>
-        <div>Размерность: <strong id="shape">—</strong></div>
+        <h3>General information</h3>
+        <div>Dimension: <strong id="shape">—</strong></div>
         <div style="margin-top:8px;">
           <table>
-            <thead><tr><th>Столбец</th><th>Dtype</th></tr></thead>
+            <thead><tr><th>Column</th><th>Dtype</th></tr></thead>
             <tbody id="dtypes-tbody"></tbody>
           </table>
         </div>
       </div>
 
       <div class="card col-6">
-        <h3>Пропущенные значения</h3>
+        <h3>Missing values</h3>
         <div id="missing-chart" class="chart"></div>
       </div>
 
       <div class="card col-12">
-        <h3>Распределения (числовые)</h3>
+        <h3>Numeric distribution</h3>
         <div id="dist-charts"></div>
       </div>
 
       <div class="card col-6">
-        <h3>Частоты категориальных</h3>
+        <h3>Frequencies of categorical</h3>
         <div id="cat-make" class="chart"></div>
         <div id="cat-body" class="chart"></div>
         <div id="cat-drive" class="chart"></div>
       </div>
 
       <div class="card col-6">
-        <h3>Матрица корреляций</h3>
+        <h3>Correlation matrix</h3>
         <div id="corr-heatmap" class="chart"></div>
       </div>
 
       <div class="card col-12">
-        <h3>Новые признаки для модели</h3>
+        <h3>New features</h3>
         <ul id="engineered-list"></ul>
       </div>
 
       <div class="card col-12">
-        <h3>Автоматические выводы на основе диаграмм</h3>
+        <h3>Automatic inferences based on diagrams</h3>
         <ul id="conclusions-list"></ul>
       </div>
 
       <div class="card col-12">
-        <h3>Первые строки подготовленного датасета</h3>
+        <h3>The first lines of the prepared dataset</h3>
         <table id="head-table" style="display:none;">
           <thead id="head-thead"></thead>
           <tbody id="head-tbody"></tbody>
@@ -89,7 +88,6 @@
     </div>
 
     <footer>
-      <p>Подсказка: добавьте этот репозиторий в GitHub → Settings → Pages, и укажите / (root) ветку <code>main</code>.</p>
     </footer>
   </div>
 
