@@ -55,13 +55,14 @@ function renderMissing() {
 }
 
 /**
- * Новый вариант: в карточке "Распределения (числовые)"
- * создаём выпадающий список колонок и ОДИН график гистограммы.
+ * ОДИН график + селект числовых колонок.
  */
 function renderDists() {
   const d = getPayload("data-dists") || {};
   const container = document.getElementById("dist-charts");
-  container.innerHTML = "";
+
+  // полная очистка контейнера (чтобы не осталось старых mini-чартов)
+  container.replaceChildren();
 
   const cols = Object.keys(d);
   if (!cols.length) {
@@ -69,55 +70,68 @@ function renderDists() {
     return;
   }
 
-  // UI: селект + (опционально) количество корзин
+  // UI: селект + количество корзин + вид графика
   const ui = document.createElement("div");
   ui.className = "controls";
   ui.style.marginBottom = "8px";
 
-  const labelSel = document.createElement("label");
-  labelSel.textContent = "Колонка:";
-  labelSel.style.opacity = 0.8;
+  const mkLabel = (text) => {
+    const l = document.createElement("label");
+    l.textContent = text;
+    l.style.opacity = 0.8;
+    return l;
+  };
 
   const select = document.createElement("select");
-  select.id = "dist-select";
-  select.style.background = "#0c1430";
-  select.style.color = "var(--text)";
-  select.style.border = "1px solid var(--border)";
-  select.style.borderRadius = "12px";
-  select.style.padding = "8px 10px";
-  select.style.minWidth = "220px";
-
+  Object.assign(select.style, {
+    background: "#0c1430",
+    color: "var(--text)",
+    border: "1px solid var(--border)",
+    borderRadius: "12px",
+    padding: "8px 10px",
+    minWidth: "220px"
+  });
   cols.forEach(c => {
     const opt = document.createElement("option");
-    opt.value = c;
-    opt.textContent = c;
+    opt.value = c; opt.textContent = c;
     select.appendChild(opt);
   });
 
-  const labelBins = document.createElement("label");
-  labelBins.textContent = "Корзин:";
-  labelBins.style.opacity = 0.8;
-
   const bins = document.createElement("input");
-  bins.type = "number";
-  bins.min = "5";
-  bins.max = "200";
-  bins.value = "40";
-  bins.step = "5";
-  bins.id = "dist-bins";
-  bins.style.width = "90px";
-  bins.style.background = "#0c1430";
-  bins.style.color = "var(--text)";
-  bins.style.border = "1px solid var(--border)";
-  bins.style.borderRadius = "12px";
-  bins.style.padding = "8px 10px";
+  Object.assign(bins, { type: "number", min: "5", max: "200", value: "40", step: "5" });
+  Object.assign(bins.style, {
+    width: "90px",
+    background: "#0c1430",
+    color: "var(--text)",
+    border: "1px solid var(--border)",
+    borderRadius: "12px",
+    padding: "8px 10px"
+  });
 
-  ui.appendChild(labelSel);
+  const mode = document.createElement("select");
+  ["hist","box","violin"].forEach(m => {
+    const o = document.createElement("option");
+    o.value = m;
+    o.textContent = ({hist:"Гистограмма", box:"Box plot", violin:"Violin"})[m];
+    mode.appendChild(o);
+  });
+  Object.assign(mode.style, {
+    background: "#0c1430",
+    color: "var(--text)",
+    border: "1px solid var(--border)",
+    borderRadius: "12px",
+    padding: "8px 10px",
+    minWidth: "160px"
+  });
+
+  ui.appendChild(mkLabel("Колонка:"));
   ui.appendChild(select);
-  ui.appendChild(labelBins);
+  ui.appendChild(mkLabel("Режим:"));
+  ui.appendChild(mode);
+  ui.appendChild(mkLabel("Корзин:"));
   ui.appendChild(bins);
 
-  // контейнер графика
+  // контейнер для одного графика
   const plot = document.createElement("div");
   plot.id = "dist-chart";
   plot.className = "chart";
@@ -125,26 +139,39 @@ function renderDists() {
   container.appendChild(ui);
   container.appendChild(plot);
 
-  // функция отрисовки выбранной колонки
   const draw = () => {
     const col = select.value;
-    const nb = Math.max(5, Math.min(200, parseInt(bins.value || "40", 10)));
     const arr = d[col] || [];
+    const nb = Math.max(5, Math.min(200, parseInt(bins.value || "40", 10)));
+    const m = mode.value;
 
-    const trace = {
-      x: arr,
-      type: "histogram",
-      nbinsx: nb,
-      marker: { line: { width: 0 } },
-      hovertemplate: "%{x}<extra></extra>"
-    };
+    let trace, layoutTitle = `Распределение: ${col}`;
+
+    if (m === "hist") {
+      trace = {
+        x: arr, type: "histogram", nbinsx: nb,
+        hovertemplate: "%{x}<extra></extra>"
+      };
+    } else if (m === "box") {
+      trace = {
+        y: arr, type: "box", boxpoints: false,
+        hovertemplate: "%{y}<extra></extra>"
+      };
+      layoutTitle = `Box plot: ${col}`;
+    } else { // violin
+      trace = {
+        y: arr, type: "violin", points: "none",
+        hovertemplate: "%{y}<extra></extra>"
+      };
+      layoutTitle = `Violin: ${col}`;
+    }
 
     const layout = {
-      title: `Распределение: ${col}`,
+      title: layoutTitle,
       margin: { t: 36, r: 10, b: 40, l: 50 },
       autosize: true,
       xaxis: { automargin: true, tickfont: { size: 11 } },
-      yaxis: { automargin: true, tickfont: { size: 11 }, title: "Частота" }
+      yaxis: { automargin: true, tickfont: { size: 11 }, title: m==="hist" ? "Частота" : "" }
     };
 
     Plotly.newPlot(plot, [trace], layout, PLOTLY_CONFIG);
@@ -153,10 +180,11 @@ function renderDists() {
 
   // события
   select.addEventListener("change", draw);
+  mode.addEventListener("change", draw);
+  bins.addEventListener("input", draw);
   bins.addEventListener("change", draw);
-  bins.addEventListener("input", () => { /* мгновенная реакция */ draw(); });
 
-  // первичный рендер
+  // первый рендер
   draw();
 }
 
@@ -248,7 +276,7 @@ function renderHeadTable() {
 function hydrateAll() {
   renderOverview();
   renderMissing();
-  renderDists();        // <- теперь селект + одиночная гистограмма
+  renderDists();        // <- селект + одиночная гистограмма/box/violin
   renderCats();
   renderCorr();
   renderConclusions();
