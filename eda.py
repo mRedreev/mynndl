@@ -153,9 +153,9 @@ def make_conclusions(corr_items):
     for item in corr_items:
         feat = item['feature']
         val = item['corr_with_price']
-        direction = "выше" if val > 0 else "ниже"
-        strength = 'высокую' if abs(val) >= 0.5 else ('умеренную' if abs(val) >= 0.3 else 'слабую')
-        bullets.append(f"Признак '{feat}' имеет {strength} корреляцию с ценой ({val:.2f}): чем {feat} больше, тем {direction} цена (в среднем).")
+        direction = "higher" if val > 0 else "lower"
+        strength = 'high' if abs(val) >= 0.5 else ('moderate' if abs(val) >= 0.3 else 'weak')
+        bullets.append(f"Feature '{feat}' has {strength} correlation with price ({val:.2f}): comparing to {feat} higher, than {direction} price (on average).")
         # при желании сюда можно добавить интерпретации для бинарных/лог. переменных
     return bullets
 
