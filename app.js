@@ -130,9 +130,18 @@ function hydrateAll() {
 
 function observeReady() {
   const flag = document.getElementById("eda-ready-flag");
-  const obs = new MutationObserver(()=>{
-    if (flag.textContent === "ready") hydrateAll();
-  });
+  if (!flag) return;
+
+  const runIfReady = () => {
+    if (flag.textContent === "ready") {
+      hydrateAll();
+    }
+  };
+
+  // Run immediately in case PyScript finished before the observer was attached.
+  runIfReady();
+
+  const obs = new MutationObserver(runIfReady);
   obs.observe(flag, {childList: true});
 }
 
